@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Red ENES - Nodos Universitarios</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" />
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+            opacity: 0; 
+            user-select: none;
+            transition: opacity 0.3s ease-in;
+        }
+
+        .fonts-loaded .material-symbols-outlined {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
+
+    <nav class="bg-slate-900 text-white sticky top-0 z-50 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center cursor-pointer group" onclick="navigateTo('')">
+                    <span class="material-symbols-outlined text-3xl mr-2 text-blue-400">groups</span>
+                    <span class="ml-1 font-bold text-xl tracking-tight">Red ENES</span>
+                </div>
+                <div class="hidden md:flex space-x-8">
+                    <button onclick="navigateTo('')" class="hover:text-blue-400 transition-colors font-medium">Inicio</button>
+                    <a href="Investigaciones.html" class="hover:text-indigo-400 transition-colors font-medium">Directorio Académico</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main id="app-content" class="flex-grow">
+        <div id="home-view" class="animate-in fade-in duration-300">
+            <div class="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 text-white py-20 px-4 relative overflow-hidden">
+                <div class="max-w-4xl mx-auto text-center relative z-10">
+                    <h1 class="text-4xl md:text-6xl font-extrabold mb-6 leading-tight">
+                        Encuentro Nacional de <span class="text-blue-400">Estudiantes de Sociología</span>
+                    </h1>
+                    <p class="text-xl md:text-2xl text-slate-300 mb-10 max-w-3xl mx-auto leading-relaxed">
+                        Conectando las carreras de sociología del país. Explora y construye redes académicas desde tu universidad.
+                    </p>
+                    <button onclick="window.location.hash='#/uni/unse'" class="bg-white/10 hover:bg-white/20 border border-white/20 text-white py-3 px-6 md:px-8 rounded-full shadow-lg transition-all hover:scale-105 flex flex-col md:flex-row items-center mx-auto backdrop-blur-sm group text-sm md:text-base">
+                        <span class="flex items-center mb-1 md:mb-0 text-blue-300 font-bold tracking-wide">
+                            <span class="material-symbols-outlined mr-2">location_on</span>
+                            Próxima sede del ENES:
+                        </span>
+                        <span class="md:ml-2 font-medium">Universidad Nacional de Santiago del Estero</span>
+                        <span class="material-symbols-outlined ml-2 opacity-70 group-hover:translate-x-1 transition-transform hidden md:block">arrow_forward</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="universities-grid-section" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold text-slate-900 mb-4">Nodos Universitarios</h2>
+                    <p class="text-slate-600 max-w-2xl mx-auto text-lg">Accede a la información de tu plan de estudios y novedades locales.</p>
+                </div>
+                
+                <div id="universities-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div class="col-span-full text-center py-20">
+                        <p class="text-slate-400 animate-pulse font-medium italic">Sincronizando facultades...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="dynamic-view" class="hidden"></div>
+    </main>
+
+    <footer class="bg-slate-900 text-slate-400 py-10 border-t border-slate-800 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <span class="text-white font-bold block mb-2">Red ENES</span>
+            <p class="text-xs">Espacio de organización para estudiantes de sociología en Argentina.</p>
+        </div>
+    </footer>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, doc, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB58mSlST85kAYJDaKzZFdmfjd8LK1CndQ",
+            authDomain: "enes-arg.firebaseapp.com",
+            projectId: "enes-arg",
+            storageBucket: "enes-arg.firebasestorage.app",
+            messagingSenderId: "327888160447",
+            appId: "1:327888160447:web:574b132e3573fbf6ad680a"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let universities = [];
+        let newsCache = {}; 
+        let selectedUni = null;
+        let universityNewsUnsubscribe = null;
+        let newsDetailUnsubscribe = null;
+        let universityInvestigationsUnsubscribe = null;
+        
+        let visibleNewsCount = 5;
+        const newsStep = 5;
+
+        if (document.fonts) {
+            document.fonts.load('1em "Material Symbols Outlined"').then(() => {
+                document.documentElement.classList.add('fonts-loaded');
+            }).catch(() => {
+                document.documentElement.classList.add('fonts-loaded');
+            });
+        } else {
+            setTimeout(() => document.documentElement.classList.add('fonts-loaded'), 500);
+        }
+
+        function clearSubscriptions() {
+            if (newsDetailUnsubscribe) newsDetailUnsubscribe();
+            if (universityNewsUnsubscribe) universityNewsUnsubscribe();
+            if (universityInvestigationsUnsubscribe) universityInvestigationsUnsubscribe();
+            newsDetailUnsubscribe = null;
+            universityNewsUnsubscribe = null;
+            universityInvestigationsUnsubscribe = null;
+        }
+
+        async function handleRoute() {
+            window.scrollTo(0, 0);
+            
+            const path = window.location.hash.replace(/^#\/?/, '');
+            const parts = path.split('/');
+            const homeView = document.getElementById('home-view');
+            const dynamicView = document.getElementById('dynamic-view');
+
+            if (parts[0] === 'uni' && parts[1]) {
+                const uniId = decodeURIComponent(parts[1]);
+                selectedUni = universities.find(u => u.id === uniId);
+                homeView.classList.add('hidden');
+                dynamicView.classList.remove('hidden');
+
+                if (selectedUni) {
+                    if (parts[2] === 'noticia' && parts[3]) {
+                        renderNewsDetail(uniId, decodeURIComponent(parts[3]));
+                    } else {
+                        renderUniversityProfile(selectedUni);
+                    }
+                } else {
+                    dynamicView.innerHTML = `<div class="py-20 text-center text-slate-400 italic">Cargando nodo...</div>`;
+                }
+            } else {
+                clearSubscriptions();
+                dynamicView.classList.add('hidden');
+                homeView.classList.remove('hidden');
+                renderUniversitiesGrid();
+            }
+        }
+
+        window.navigateTo = function(path) {
+            window.location.hash = '#/' + path;
+        }
+
+        window.loadMoreNews = function(uniId) {
+            visibleNewsCount += newsStep;
+            renderPaginatedNews(uniId);
+        }
+
+        function renderUniversitiesGrid() {
+            const container = document.getElementById('universities-container');
+            if (!container || universities.length === 0) return;
+
+            container.innerHTML = universities.map(uni => `
+                <div onclick="window.location.hash='#/uni/${encodeURIComponent(uni.id)}'" class="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer border border-slate-100 group flex flex-col h-full">
+                    <div class="${uni.color || 'bg-slate-700'} h-24 relative flex items-center justify-center">
+                        <span class="material-symbols-outlined text-7xl opacity-20 absolute scale-150">school</span>
+                        <h3 class="text-3xl font-black text-white tracking-widest relative z-10">${uni.siglas || ''}</h3>
+                    </div>
+                    <div class="p-6 flex-grow flex flex-col">
+                        <h4 class="text-xl font-bold text-slate-900 mb-2">${uni.nombre || ''}</h4>
+                        <div class="flex items-center text-slate-500 mb-4 text-sm">
+                            <span class="material-symbols-outlined text-base mr-2">location_on</span> ${uni.ubicacion || ''}
+                        </div>
+                        <p class="text-slate-600 line-clamp-3 mb-6 flex-grow text-sm">${uni.descripcion || ''}</p>
+                        <div class="flex items-center justify-between mt-auto pt-4 border-t border-slate-100 text-sm font-semibold text-blue-600">
+                            <span>Explorar nodo</span>
+                            <span class="material-symbols-outlined transform group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderUniversityProfile(uni) {
+            const container = document.getElementById('dynamic-view');
+            visibleNewsCount = 5; 
+            
+            container.innerHTML = `
+                <div class="animate-in slide-in-from-right-8 fade-in duration-300 bg-white min-h-[calc(100vh-4rem)]">
+                    <div class="${uni.color || 'bg-slate-700'} text-white pt-6 pb-10 px-4">
+                        <div class="max-w-5xl mx-auto">
+                            <button onclick="navigateTo('')" class="flex items-center text-white/80 hover:text-white mb-6 bg-white/10 px-4 py-2 rounded-lg backdrop-blur-sm w-max transition-colors">
+                                <span class="material-symbols-outlined mr-2">arrow_back</span> Volver
+                            </button>
+                            <div class="flex justify-between items-end">
+                                <div>
+                                    <h1 class="text-4xl font-bold mb-2">${uni.nombre || ''}</h1>
+                                    <p class="text-xl text-white/90">${uni.facultad || ''}</p>
+                                </div>
+                                <div class="bg-white/10 p-4 rounded-xl backdrop-blur-md border border-white/20 text-center min-w-[100px]">
+                                    <span class="block text-2xl font-black">${uni.siglas || ''}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="max-w-5xl mx-auto px-4 py-12">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                            <div class="lg:col-span-2 space-y-10">
+                                <section>
+                                    <h2 class="text-2xl font-bold text-slate-900 mb-4 flex items-center">
+                                        <span class="material-symbols-outlined mr-3 text-3xl text-blue-600">menu_book</span> Carrera
+                                    </h2>
+                                    <p class="text-lg text-slate-700 leading-relaxed bg-slate-50 p-6 rounded-2xl border border-slate-100">${uni.descripcion || ''}</p>
+                                </section>
+                                
+                                <div id="news-section-start" class="scroll-mt-24"></div>
+                                <section id="news-container">
+                                    <h2 class="text-2xl font-bold text-slate-900 mb-6 flex items-center">
+                                        <span class="material-symbols-outlined mr-3 text-3xl text-blue-600">article</span> Comunicados
+                                    </h2>
+                                    <div class="text-slate-400 italic">Sincronizando con el nodo...</div>
+                                </section>
+
+                                <div id="investigations-section-start" class="scroll-mt-24"></div>
+                                <section id="investigations-container">
+                                    <h2 class="text-2xl font-bold text-slate-900 mb-6 flex items-center">
+                                        <span class="material-symbols-outlined mr-3 text-3xl text-indigo-600">science</span> Investigaciones recientes
+                                    </h2>
+                                    <div class="text-slate-400 italic">Buscando documentos académicos...</div>
+                                </section>
+                            </div>
+                            <div class="space-y-6">
+                                <div class="bg-slate-50 rounded-2xl p-6 border border-slate-200">
+                                    <h3 class="font-bold text-slate-900 mb-4 border-b pb-2 flex items-center">
+                                        <span class="material-symbols-outlined mr-2 text-xl">info</span> Información
+                                    </h3>
+                                    <div class="space-y-3 text-sm">
+                                        <p class="flex items-center"><span class="material-symbols-outlined text-sm mr-2 opacity-50">location_on</span> <strong>Ubicación:</strong> <span class="ml-1">${uni.ubicacion || ''}</span></p>
+                                        <p class="flex items-center"><span class="material-symbols-outlined text-sm mr-2 opacity-50">map</span> <strong>Dirección:</strong> <span class="ml-1">${uni.direccion || ''}</span></p>
+                                        <p class="flex items-center"><span class="material-symbols-outlined text-sm mr-2 opacity-50">group</span> <strong>Estudiantes:</strong> <span class="ml-1">${uni.cantidadEstudiantes || ''}</span></p>
+                                        <p class="flex items-center"><span class="material-symbols-outlined text-sm mr-2 opacity-50">event</span> <strong>Fundación:</strong> <span class="ml-1">${uni.creacion || ''}</span></p>
+                                    </div>
+                                </div>
+                                <a href="${uni.enlace}" target="_blank" class="w-full bg-slate-900 text-white font-semibold py-4 rounded-xl flex items-center justify-center hover:bg-slate-800 transition-all">
+                                    <span class="material-symbols-outlined mr-2">open_in_new</span> Sitio Web Oficial
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            loadNews(uni.id);
+            loadInvestigations(uni.id);
+        }
+
+        function renderNewsDetail(uniId, newsId) {
+            const container = document.getElementById('dynamic-view');
+            const newsDocRef = doc(db, 'universidades', uniId, 'noticias', newsId);
+            
+            newsDetailUnsubscribe = onSnapshot(newsDocRef, (docSnap) => {
+                if (!docSnap.exists()) {
+                    container.innerHTML = `<div class="p-20 text-center">Comunicado no encontrado.</div>`;
+                    return;
+                }
+                const n = docSnap.data();
+                container.innerHTML = `
+                    <div class="animate-in fade-in duration-300 max-w-3xl mx-auto px-4 py-12">
+                        <button onclick="window.location.hash='#/uni/${encodeURIComponent(uniId)}'" class="flex items-center text-blue-600 mb-8 font-medium">
+                            <span class="material-symbols-outlined mr-2">arrow_back</span> Volver al nodo
+                        </button>
+                        <article>
+                            <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-bold uppercase mb-4 inline-block">${n.categoria || ''}</span>
+                            <h1 class="text-4xl font-extrabold text-slate-900 mb-6">${n.titulo || ''}</h1>
+                            <div class="flex items-center text-slate-500 text-sm mb-10">
+                                <span class="material-symbols-outlined text-base mr-2">calendar_today</span> ${n.fecha || ''}
+                            </div>
+                            <div class="text-lg text-slate-700 leading-relaxed whitespace-pre-line">${n.contenido || ''}</div>
+                        </article>
+                    </div>
+                `;
+            });
+        }
+
+        function loadNews(uniId) {
+            if (newsCache[uniId]) renderPaginatedNews(uniId);
+            
+            const newsRef = collection(db, 'universidades', uniId, 'noticias');
+            if (universityNewsUnsubscribe) universityNewsUnsubscribe();
+            
+            universityNewsUnsubscribe = onSnapshot(newsRef, (snapshot) => {
+                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                data.sort((a, b) => new Date(b.fecha || '1970-01-01') - new Date(a.fecha || '1970-01-01'));
+                newsCache[uniId] = data;
+                renderPaginatedNews(uniId);
+            });
+        }
+
+        function renderPaginatedNews(uniId) {
+            const container = document.getElementById('news-container');
+            const items = newsCache[uniId] || [];
+            if (!container) return;
+
+            if (items.length === 0) {
+                container.innerHTML = `<h2 class="text-2xl font-bold text-slate-900 mb-6 flex items-center"><span class="material-symbols-outlined mr-3 text-3xl text-blue-600">article</span> Comunicados</h2><p class="text-slate-500 italic p-6 border rounded-xl bg-slate-50">No hay noticias publicadas aún.</p>`;
+                return;
+            }
+
+            const visibleItems = items.slice(0, visibleNewsCount);
+            const hasMore = items.length > visibleNewsCount;
+
+            const html = visibleItems.map(n => `
+                <div onclick="window.location.hash='#/uni/${encodeURIComponent(uniId)}/noticia/${encodeURIComponent(n.id)}'" class="p-5 border border-slate-200 rounded-xl hover:border-blue-300 bg-white cursor-pointer group mb-4 transition-all">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-1 rounded">${n.categoria || ''}</span>
+                        <span class="text-xs text-slate-400 font-medium">${n.fecha || ''}</span>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900 group-hover:text-blue-600">${n.titulo || ''}</h3>
+                    <p class="text-slate-600 text-sm line-clamp-2 mt-2">${n.resumen || ''}</p>
+                </div>
+            `).join('');
+
+            const loadMoreBtn = hasMore ? `
+                <button onclick="loadMoreNews('${uniId}')" class="w-full py-4 mt-4 border-2 border-dashed border-slate-200 text-slate-500 font-semibold rounded-xl hover:border-blue-300 hover:text-blue-600 transition-all flex items-center justify-center">
+                    Cargar más comunicados <span class="material-symbols-outlined ml-2">expand_more</span>
+                </button>
+            ` : '';
+
+            container.innerHTML = `
+                <h2 class="text-2xl font-bold text-slate-900 mb-6 flex items-center"><span class="material-symbols-outlined mr-3 text-3xl text-blue-600">article</span> Comunicados</h2>
+                <div class="space-y-4 animate-in fade-in duration-500">${html}</div>
+                ${loadMoreBtn}
+            `;
+        }
+
+        function loadInvestigations(uniId) {
+            const invRef = collection(db, 'investigaciones');
+            const q = query(invRef, where('universidadId', '==', uniId));
+            
+            if (universityInvestigationsUnsubscribe) universityInvestigationsUnsubscribe();
+            
+            universityInvestigationsUnsubscribe = onSnapshot(q, (snapshot) => {
+                let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // El ordenamiento y límite se mantienen en memoria para evitar errores de índices compuestos
+                data.sort((a, b) => new Date(b.fecha || '1970-01-01') - new Date(a.fecha || '1970-01-01'));
+                
+                const recentInv = data.slice(0, 5);
+                renderRecentInvestigations(recentInv);
+            });
+        }
+
+        function renderRecentInvestigations(items) {
+            const container = document.getElementById('investigations-container');
+            if (!container) return;
+
+            if (items.length === 0) {
+                container.innerHTML = `
+                    <h2 class="text-2xl font-bold text-slate-900 mb-6 flex items-center"><span class="material-symbols-outlined mr-3 text-3xl text-indigo-600">science</span> Investigaciones recientes</h2>
+                    <p class="text-slate-500 italic p-6 border rounded-xl bg-slate-50">Aún no hay trabajos académicos registrados para este nodo.</p>
+                `;
+                return;
+            }
+
+            const html = items.map(inv => {
+                let keywordsHtml = '';
+                if (inv.palabrasClave) {
+                    const keywordsArray = Array.isArray(inv.palabrasClave) ? inv.palabrasClave : inv.palabrasClave.split(',').map(k => k.trim());
+                    keywordsHtml = keywordsArray.slice(0, 3).map(kw => `<span class="inline-block bg-slate-50 text-slate-500 text-[10px] font-semibold px-2 py-0.5 rounded mr-1.5 mb-1.5 border border-slate-200">${kw}</span>`).join('');
+                }
+
+                return `
+                <div class="p-5 border border-slate-200 rounded-xl hover:border-indigo-300 bg-white shadow-sm transition-all mb-4 group relative overflow-hidden">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100">${inv.categoria || 'Investigación'}</span>
+                        <span class="text-xs text-slate-400 font-medium flex items-center">
+                            <span class="material-symbols-outlined text-xs mr-1">calendar_today</span> ${inv.fecha || 'S/F'}
+                        </span>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors">${inv.titulo || 'Sin título'}</h3>
+                    <div class="flex items-center text-xs text-slate-500 font-medium mb-4">
+                        <span class="material-symbols-outlined text-[14px] mr-1.5">person</span> ${inv.autores || 'Autoría anónima'}
+                    </div>
+                    <div class="flex flex-wrap mt-1">
+                        ${keywordsHtml}
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-slate-100">
+                        <a href="${inv.enlace || '#'}" target="_blank" class="text-indigo-600 text-sm font-semibold flex items-center hover:text-indigo-800 transition-colors w-max">
+                            Consultar documento <span class="material-symbols-outlined text-[14px] ml-1">arrow_forward</span>
+                        </a>
+                    </div>
+                </div>
+                `;
+            }).join('');
+
+            container.innerHTML = `
+                <h2 class="text-2xl font-bold text-slate-900 mb-6 flex items-center"><span class="material-symbols-outlined mr-3 text-3xl text-indigo-600">science</span> Investigaciones recientes</h2>
+                <div class="space-y-4 animate-in fade-in duration-500">${html}</div>
+                <a href="Investigaciones.html" class="w-full py-4 mt-4 border-2 border-dashed border-indigo-100 text-indigo-500 font-semibold rounded-xl hover:border-indigo-300 hover:text-indigo-700 hover:bg-indigo-50 transition-all flex items-center justify-center">
+                    Ver todo el directorio académico <span class="material-symbols-outlined ml-2 text-lg">open_in_new</span>
+                </a>
+            `;
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                onSnapshot(collection(db, 'universidades'), (snapshot) => {
+                    universities = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    handleRoute();
+                });
+            } else {
+                signInAnonymously(auth);
+            }
+        });
+
+        window.addEventListener('hashchange', handleRoute);
+        window.addEventListener('load', handleRoute);
+    </script>
+</body>
+</html>
