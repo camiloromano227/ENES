@@ -200,6 +200,22 @@
             const container = document.getElementById('dynamic-view');
             visibleNewsCount = 5; 
             
+            let gestionHtml = '';
+            if (uni.publica) {
+                let textoGestion = uni.publica;
+                let colorClases = 'bg-slate-100 text-slate-700 border-slate-200';
+                
+                if (uni.publica.toLowerCase() === 'si' || uni.publica.toLowerCase() === 'sí') {
+                    textoGestion = 'Pública';
+                    colorClases = 'bg-emerald-100 text-emerald-700 border-emerald-200';
+                } else if (uni.publica.toLowerCase() === 'no') {
+                    textoGestion = 'Arancelada';
+                    colorClases = 'bg-amber-100 text-amber-700 border-amber-200';
+                }
+                
+                gestionHtml = `<div class="mt-2 pt-3 border-t border-slate-100"><span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border ${colorClases}">${textoGestion}</span></div>`;
+            }
+
             container.innerHTML = `
                 <div class="animate-in slide-in-from-right-8 fade-in duration-300 bg-white min-h-[calc(100vh-4rem)]">
                     <div class="${uni.color || 'bg-slate-700'} text-white pt-6 pb-10 px-4">
@@ -254,6 +270,7 @@
                                         <p class="flex items-center"><span class="material-symbols-outlined text-sm mr-2 opacity-50">map</span> <strong>Dirección:</strong> <span class="ml-1">${uni.direccion || ''}</span></p>
                                         <p class="flex items-center"><span class="material-symbols-outlined text-sm mr-2 opacity-50">group</span> <strong>Estudiantes:</strong> <span class="ml-1">${uni.cantidadEstudiantes || ''}</span></p>
                                         <p class="flex items-center"><span class="material-symbols-outlined text-sm mr-2 opacity-50">event</span> <strong>Fundación:</strong> <span class="ml-1">${uni.creacion || ''}</span></p>
+                                        ${gestionHtml}
                                     </div>
                                 </div>
                                 <a href="${uni.enlace}" target="_blank" class="w-full bg-slate-900 text-white font-semibold py-4 rounded-xl flex items-center justify-center hover:bg-slate-800 transition-all">
