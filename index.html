@@ -27,13 +27,13 @@
     <nav class="bg-slate-900 text-white sticky top-0 z-50 shadow-md">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16 items-center">
-                <div class="flex items-center cursor-pointer group" onclick="navigateTo('')">
-                    <span class="material-symbols-outlined text-3xl mr-2 text-blue-400">groups</span>
-                    <span class="ml-1 font-bold text-xl tracking-tight">Red ENES</span>
+                <div class="flex items-center cursor-pointer group shrink-0 mr-4" onclick="navigateTo('')">
+                    <span class="material-symbols-outlined text-3xl mr-1 md:mr-2 text-blue-400">groups</span>
+                    <span class="font-bold text-lg md:text-xl tracking-tight">Red ENES</span>
                 </div>
-                <div class="hidden md:flex space-x-8">
+                <div class="flex items-center space-x-4 md:space-x-8 text-sm md:text-base">
                     <button onclick="navigateTo('')" class="hover:text-blue-400 transition-colors font-medium">Inicio</button>
-                    <a href="investigaciones" class="hover:text-indigo-400 transition-colors font-medium">Directorio Académico</a>
+                    <a href="Investigaciones.html" class="hover:text-indigo-400 transition-colors font-medium text-right leading-tight">Repositorio<span class="hidden sm:inline"> Académico</span></a>
                 </div>
             </div>
         </div>
@@ -236,7 +236,7 @@
                     </div>
                     <div class="max-w-5xl mx-auto px-4 py-12">
                         <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
-                            <div class="lg:col-span-2 space-y-10">
+                            <div class="lg:col-span-2 space-y-10 order-2 lg:order-1">
                                 <section>
                                     <h2 class="text-2xl font-bold text-slate-900 mb-4 flex items-center">
                                         <span class="material-symbols-outlined mr-3 text-3xl text-blue-600">menu_book</span> Carrera
@@ -260,7 +260,7 @@
                                     <div class="text-slate-400 italic">Buscando documentos académicos...</div>
                                 </section>
                             </div>
-                            <div class="space-y-6">
+                            <div class="space-y-6 order-1 lg:order-2">
                                 <div class="bg-slate-50 rounded-2xl p-6 border border-slate-200">
                                     <h3 class="font-bold text-slate-900 mb-4 border-b pb-2 flex items-center">
                                         <span class="material-symbols-outlined mr-2 text-xl">info</span> Información
@@ -373,7 +373,6 @@
             universityInvestigationsUnsubscribe = onSnapshot(q, (snapshot) => {
                 let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
-                // El ordenamiento y límite se mantienen en memoria para evitar errores de índices compuestos
                 data.sort((a, b) => new Date(b.fecha || '1970-01-01') - new Date(a.fecha || '1970-01-01'));
                 
                 const recentInv = data.slice(0, 5);
