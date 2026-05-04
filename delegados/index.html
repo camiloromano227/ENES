@@ -74,56 +74,6 @@
                             Ingresar al sistema
                         </button>
                     </form>
-                    <div class="mt-8 text-center border-t border-slate-100 pt-6">
-                        <p class="text-sm text-slate-600">
-                            ¿Eres nuevo delegado? 
-                            <button onclick="toggleAuthMode()" class="font-bold text-emerald-600 hover:text-emerald-500 transition-colors">Regístrate aquí</button>
-                        </p>
-                    </div>
-                </div>
-
-                <div id="register-container" class="hidden">
-                    <div class="text-center mb-8">
-                        <span class="material-symbols-outlined text-5xl text-emerald-600 mb-2">badge</span>
-                        <h2 class="text-3xl font-extrabold text-slate-900">Nuevo Registro</h2>
-                        <p class="mt-2 text-sm text-slate-500">Solicita acceso para gestionar tu facultad</p>
-                    </div>
-                    <form id="register-form" class="space-y-4" onsubmit="handleRegister(event)">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Nombre</label>
-                                <input id="reg-nombre" type="text" required class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 transition-colors bg-slate-50">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Apellido</label>
-                                <input id="reg-apellido" type="text" required class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 transition-colors bg-slate-50">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Universidad / Nodo representativo</label>
-                            <select id="reg-universidad" required class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 transition-colors bg-slate-50 cursor-pointer">
-                                <option value="">Cargando facultades...</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Correo Electrónico</label>
-                            <input id="reg-email" type="email" required class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 transition-colors bg-slate-50">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Contraseña (mínimo 6 caracteres)</label>
-                            <input id="reg-password" type="password" minlength="6" required class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 transition-colors bg-slate-50">
-                        </div>
-                        <div id="register-error" class="hidden text-red-500 text-sm font-medium text-center bg-red-50 p-3 rounded-lg border border-red-100"></div>
-                        <button type="submit" id="register-btn" class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600 transition-all mt-6">
-                            Crear cuenta de delegado
-                        </button>
-                    </form>
-                    <div class="mt-6 text-center border-t border-slate-100 pt-6">
-                        <p class="text-sm text-slate-600">
-                            ¿Ya tienes cuenta? 
-                            <button onclick="toggleAuthMode()" class="font-bold text-slate-900 hover:text-slate-700 transition-colors">Volver al ingreso</button>
-                        </p>
-                    </div>
                 </div>
 
             </div>
@@ -317,7 +267,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, getDocs, doc, setDoc, getDoc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -352,7 +302,6 @@
                 currentUser = null;
                 delegateData = null;
                 showAuthSection();
-                loadUniversitiesForRegistration();
             }
             document.getElementById('global-loader').style.display = 'none';
         });
@@ -407,58 +356,6 @@
             }
         }
 
-        window.handleRegister = async function(e) {
-            e.preventDefault();
-            const email = document.getElementById('reg-email').value;
-            const pass = document.getElementById('reg-password').value;
-            const nombre = document.getElementById('reg-nombre').value;
-            const apellido = document.getElementById('reg-apellido').value;
-            const uniId = document.getElementById('reg-universidad').value;
-            const btn = document.getElementById('register-btn');
-            const errBox = document.getElementById('register-error');
-
-            if (!uniId) {
-                errBox.textContent = "Debes seleccionar una universidad.";
-                errBox.classList.remove('hidden');
-                return;
-            }
-
-            btn.disabled = true;
-            btn.innerHTML = '<span class="material-symbols-outlined animate-spin mr-2">progress_activity</span> Creando cuenta...';
-            errBox.classList.add('hidden');
-
-            try {
-                const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-                const user = userCredential.user;
-                
-                await setDoc(doc(db, 'delegados', user.uid), {
-                    nombre: nombre,
-                    apellido: apellido,
-                    universidadId: uniId,
-                    email: email,
-                    fechaRegistro: new Date().toISOString()
-                });
-            } catch (error) {
-                console.error("Detalle del error de registro:", error);
-                btn.disabled = false;
-                btn.innerHTML = 'Crear cuenta de delegado';
-                
-                let mensajeError = "Ocurrió un error al intentar registrar la cuenta.";
-                if (error.code === 'auth/email-already-in-use') {
-                    mensajeError = "Este correo electrónico ya se encuentra registrado en el sistema.";
-                } else if (error.code === 'auth/operation-not-allowed') {
-                    mensajeError = "La autenticación por correo no está habilitada. Actívala en tu consola de Firebase.";
-                } else if (error.code === 'auth/weak-password') {
-                    mensajeError = "La contraseña es demasiado débil. Ingresa al menos 6 caracteres.";
-                } else if (error.code === 'auth/invalid-email') {
-                    mensajeError = "El formato del correo electrónico no es válido.";
-                }
-                
-                errBox.textContent = mensajeError;
-                errBox.classList.remove('hidden');
-            }
-        }
-
         window.logout = function() {
             signOut(auth);
             document.getElementById('nav-user-area').classList.add('hidden');
@@ -479,19 +376,6 @@
             document.getElementById('inv-fecha').value = today;
         }
 
-        window.toggleAuthMode = function() {
-            const login = document.getElementById('login-container');
-            const register = document.getElementById('register-container');
-            
-            if (login.classList.contains('hidden')) {
-                login.classList.remove('hidden');
-                register.classList.add('hidden');
-            } else {
-                login.classList.add('hidden');
-                register.classList.remove('hidden');
-            }
-        }
-
         window.switchTab = function(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById(tabId).classList.remove('hidden');
@@ -505,23 +389,6 @@
             if (activeBtn) {
                 activeBtn.classList.remove('text-slate-500', 'border-transparent');
                 activeBtn.classList.add('text-emerald-600', 'border-emerald-600');
-            }
-        }
-
-        async function loadUniversitiesForRegistration() {
-            const select = document.getElementById('reg-universidad');
-            try {
-                const snapshot = await getDocs(collection(db, 'universidades'));
-                select.innerHTML = '<option value="">Selecciona tu facultad...</option>';
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    const option = document.createElement('option');
-                    option.value = doc.id;
-                    option.textContent = data.siglas ? `${data.siglas} - ${data.nombre}` : data.nombre;
-                    select.appendChild(option);
-                });
-            } catch (error) {
-                select.innerHTML = '<option value="">Error cargando base de datos</option>';
             }
         }
 
