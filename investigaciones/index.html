@@ -122,8 +122,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyB58mSlST85kAYJDaKzZFdmfjd8LK1CndQ",
@@ -135,7 +134,6 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
         const db = getFirestore(app);
 
         let allInvestigations = [];
@@ -367,13 +365,8 @@
             applyFilters();
         });
 
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                initApp();
-            } else {
-                signInAnonymously(auth);
-            }
-        });
+        // Iniciar la aplicación sin requerir el estado de autenticación
+        initApp();
 
     </script>
 </body>
