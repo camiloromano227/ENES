@@ -87,7 +87,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, query, where, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyB58mSlST85kAYJDaKzZFdmfjd8LK1CndQ",
@@ -168,7 +168,7 @@
 
         window.loadMoreNews = function(uniId) {
             visibleNewsCount += newsStep;
-            renderPaginatedNews(uniId);
+            loadNews(uniId);
         }
 
         function renderUniversitiesGrid() {
@@ -314,14 +314,17 @@
         }
 
         function loadNews(uniId) {
-            if (newsCache[uniId]) renderPaginatedNews(uniId);
+            if (newsCache[uniId] && newsCache[uniId].length >= visibleNewsCount) {
+                renderPaginatedNews(uniId);
+            }
             
             const newsRef = collection(db, 'universidades', uniId, 'noticias');
+            const q = query(newsRef, orderBy('fecha', 'desc'), limit(visibleNewsCount + 1));
+            
             if (universityNewsUnsubscribe) universityNewsUnsubscribe();
             
-            universityNewsUnsubscribe = onSnapshot(newsRef, (snapshot) => {
+            universityNewsUnsubscribe = onSnapshot(q, (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                data.sort((a, b) => new Date(b.fecha || '1970-01-01') - new Date(a.fecha || '1970-01-01'));
                 newsCache[uniId] = data;
                 renderPaginatedNews(uniId);
             });
@@ -348,6 +351,9 @@
                     </div>
                     <h3 class="text-lg font-bold text-slate-900 group-hover:text-blue-600">${n.titulo || ''}</h3>
                     <p class="text-slate-600 text-sm line-clamp-2 mt-2">${n.resumen || ''}</p>
+                    <div class="mt-3 text-blue-600 font-semibold text-sm flex items-center group-hover:text-blue-700 transition-colors">
+                        Leer más <span class="material-symbols-outlined text-[16px] ml-1 transform group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                    </div>
                 </div>
             `).join('');
 
@@ -366,17 +372,13 @@
 
         function loadInvestigations(uniId) {
             const invRef = collection(db, 'investigaciones');
-            const q = query(invRef, where('universidadId', '==', uniId));
+            const q = query(invRef, where('universidadId', '==', uniId), orderBy('fecha', 'desc'), limit(5));
             
             if (universityInvestigationsUnsubscribe) universityInvestigationsUnsubscribe();
             
             universityInvestigationsUnsubscribe = onSnapshot(q, (snapshot) => {
                 let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                
-                data.sort((a, b) => new Date(b.fecha || '1970-01-01') - new Date(a.fecha || '1970-01-01'));
-                
-                const recentInv = data.slice(0, 5);
-                renderRecentInvestigations(recentInv);
+                renderRecentInvestigations(data);
             });
         }
 
