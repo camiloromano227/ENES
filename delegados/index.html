@@ -156,6 +156,26 @@
                                         <label class="block text-sm font-semibold text-slate-700 mb-1">Descripción del Plan de Estudios / Perfil</label>
                                         <textarea id="uni-descripcion" rows="5" required class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 bg-slate-50"></textarea>
                                     </div>
+                                    <div class="md:col-span-2 border-t border-slate-100 pt-6">
+                                        <label class="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                            <span class="material-symbols-outlined text-base text-emerald-500">add_photo_alternate</span>
+                                            Imagen de Portada
+                                        </label>
+                                        <div id="portada-preview-container" class="hidden mb-4 rounded-xl overflow-hidden border border-slate-200 relative">
+                                            <img id="portada-preview-img" src="" alt="Portada" class="w-full h-36 object-cover">
+                                            <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
+                                            <span class="absolute bottom-2 left-2 text-white text-[10px] font-semibold bg-black/50 px-2 py-0.5 rounded-full">Vista previa</span>
+                                            <button type="button" onclick="eliminarPortada()" class="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-lg px-2.5 py-1 text-xs font-semibold flex items-center gap-1 shadow transition-colors">
+                                                <span class="material-symbols-outlined text-sm">delete</span> Eliminar
+                                            </button>
+                                        </div>
+                                        <label for="uni-portada" class="inline-flex items-center gap-2 cursor-pointer px-4 py-2.5 rounded-xl border border-dashed border-slate-300 hover:border-emerald-500 hover:bg-emerald-50 transition-all text-sm text-slate-600 font-medium">
+                                            <span class="material-symbols-outlined text-lg text-slate-400">upload_file</span>
+                                            <span id="portada-label-text">Seleccionar imagen...</span>
+                                        </label>
+                                        <input id="uni-portada" type="file" accept="image/*" class="hidden" onchange="previewPortada(this)">
+                                        <p class="text-[11px] text-slate-500 mt-2 italic">Formatos: JPG, PNG.</p>
+                                    </div>
                                 </div>
                                 <div id="msg-perfil" class="hidden text-sm font-medium text-center p-3 rounded-lg"></div>
                                 <div class="flex justify-end pt-4">
@@ -269,7 +289,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, getDocs, doc, setDoc, getDoc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, doc, setDoc, getDoc, updateDoc, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyB58mSlST85kAYJDaKzZFdmfjd8LK1CndQ",
@@ -403,7 +423,7 @@
                 if (uniSnap.exists()) {
                     const data = uniSnap.data();
                     document.getElementById('dash-uni-name').textContent = data.siglas || data.nombre;
-                    
+
                     document.getElementById('uni-nombre').value = data.nombre || '';
                     document.getElementById('uni-siglas').value = data.siglas || '';
                     document.getElementById('uni-facultad').value = data.facultad || '';
@@ -413,7 +433,15 @@
                     document.getElementById('uni-creacion').value = data.creacion || '';
                     document.getElementById('uni-enlace').value = data.enlace || '';
                     document.getElementById('uni-descripcion').value = data.descripcion || '';
-                    
+
+                    const portadaSnap = await getDoc(doc(db, 'portadas', delegateData.universidadId));
+                    const portadaSrc = portadaSnap.exists() ? portadaSnap.data().imagen : null;
+                    if (portadaSrc) {
+                        document.getElementById('portada-preview-img').src = portadaSrc;
+                        document.getElementById('portada-preview-container').classList.remove('hidden');
+                        document.getElementById('portada-label-text').textContent = 'Cambiar imagen de portada';
+                    }
+
                     let valPublica = (data.publica || '').toLowerCase();
                     if (valPublica === 'sí') valPublica = 'si';
                     if (valPublica === 'si' || valPublica === 'no') {
@@ -450,6 +478,12 @@
             };
 
             try {
+                const portadaFile = document.getElementById('uni-portada').files[0];
+                if (portadaFile) {
+                    const base64 = await comprimirImagen(portadaFile);
+                    await setDoc(doc(db, 'portadas', delegateData.universidadId), { imagen: base64 });
+                }
+
                 await updateDoc(doc(db, 'universidades', delegateData.universidadId), updatedData);
                 document.getElementById('dash-uni-name').textContent = updatedData.siglas;
                 showMessage(msg, 'success', '¡Perfil institucional actualizado con éxito!');
@@ -527,6 +561,54 @@
                 btn.disabled = false;
                 btn.innerHTML = '<span class="material-symbols-outlined mr-2">cloud_upload</span> Indexar Trabajo';
             }
+        }
+
+        function comprimirImagen(file, maxWidth = 1920, maxHeight = 700, quality = 0.95) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        let w = img.width, h = img.height;
+                        if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+                        if (h > maxHeight) { w = Math.round(w * maxHeight / h); h = maxHeight; }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = w; canvas.height = h;
+                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                        const fmt = canvas.toDataURL('image/webp', 0.01).startsWith('data:image/webp')
+                            ? 'image/webp' : 'image/jpeg';
+                        resolve(canvas.toDataURL(fmt, quality));
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        window.eliminarPortada = async function() {
+            if (!delegateData || !delegateData.universidadId) return;
+            if (!confirm('¿Eliminar la imagen de portada?')) return;
+            try {
+                await deleteDoc(doc(db, 'portadas', delegateData.universidadId));
+                document.getElementById('portada-preview-container').classList.add('hidden');
+                document.getElementById('portada-preview-img').src = '';
+                document.getElementById('portada-label-text').textContent = 'Seleccionar imagen...';
+                document.getElementById('uni-portada').value = '';
+            } catch (e) {
+                alert('Error al eliminar la portada.');
+            }
+        }
+
+        window.previewPortada = function(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('portada-preview-img').src = e.target.result;
+                document.getElementById('portada-preview-container').classList.remove('hidden');
+                document.getElementById('portada-label-text').textContent = file.name;
+            };
+            reader.readAsDataURL(file);
         }
 
         function showMessage(element, type, text) {

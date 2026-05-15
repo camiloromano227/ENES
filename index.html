@@ -86,7 +86,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, doc, query, where, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, getDoc, query, where, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyB58mSlST85kAYJDaKzZFdmfjd8LK1CndQ",
@@ -169,16 +169,35 @@
             loadNews(uniId);
         }
 
-        function renderUniversitiesGrid() {
+        async function renderUniversitiesGrid() {
             const container = document.getElementById('universities-container');
             if (!container || universities.length === 0) return;
 
-            container.innerHTML = universities.map(uni => `
+            const portadasSnaps = await Promise.all(
+                universities.map(uni => getDoc(doc(db, 'portadas', uni.id)))
+            );
+            const portadasMap = {};
+            portadasSnaps.forEach((snap, i) => {
+                if (snap.exists()) portadasMap[universities[i].id] = snap.data().imagen;
+            });
+
+            container.innerHTML = universities.map(uni => {
+                const portada = portadasMap[uni.id];
+                const headerHtml = portada
+                    ? `<div class="relative overflow-hidden h-40">
+                           <img src="${portada}" class="absolute inset-0 w-full h-full object-cover" alt="${uni.siglas || ''}">
+                           <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
+                           <div class="absolute bottom-3 left-4 z-10">
+                               <span class="inline-block bg-white/20 backdrop-blur-sm border border-white/30 text-white font-black text-2xl tracking-widest px-4 py-1.5 rounded-xl shadow-lg">${uni.siglas || ''}</span>
+                           </div>
+                       </div>`
+                    : `<div class="${uni.color || 'bg-slate-700'} h-40 relative flex items-center justify-center">
+                           <span class="material-symbols-outlined text-7xl opacity-20 absolute scale-150">school</span>
+                           <h3 class="text-3xl font-black text-white tracking-widest relative z-10">${uni.siglas || ''}</h3>
+                       </div>`;
+                return `
                 <div onclick="window.location.hash='#/uni/${encodeURIComponent(uni.id)}'" class="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer border border-slate-100 group flex flex-col h-full">
-                    <div class="${uni.color || 'bg-slate-700'} h-24 relative flex items-center justify-center">
-                        <span class="material-symbols-outlined text-7xl opacity-20 absolute scale-150">school</span>
-                        <h3 class="text-3xl font-black text-white tracking-widest relative z-10">${uni.siglas || ''}</h3>
-                    </div>
+                    ${headerHtml}
                     <div class="p-6 flex-grow flex flex-col">
                         <h4 class="text-xl font-bold text-slate-900 mb-2">${uni.nombre || ''}</h4>
                         <div class="flex items-center text-slate-500 mb-4 text-sm">
@@ -190,14 +209,17 @@
                             <span class="material-symbols-outlined transform group-hover:translate-x-1 transition-transform">arrow_forward</span>
                         </div>
                     </div>
-                </div>
-            `).join('');
+                </div>`;
+            }).join('');
         }
 
-        function renderUniversityProfile(uni) {
+        async function renderUniversityProfile(uni) {
             const container = document.getElementById('dynamic-view');
-            visibleNewsCount = 5; 
-            
+            visibleNewsCount = 5;
+
+            const portadaSnap = await getDoc(doc(db, 'portadas', uni.id));
+            const imagenPortada = portadaSnap.exists() ? portadaSnap.data().imagen : null;
+
             let gestionHtml = '';
             if (uni.publica) {
                 let textoGestion = uni.publica;
@@ -214,10 +236,17 @@
                 gestionHtml = `<div class="mt-2 pt-3 border-t border-slate-100"><span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border ${colorClases}">${textoGestion}</span></div>`;
             }
 
+            const headerBg = imagenPortada ? 'relative overflow-hidden' : (uni.color || 'bg-slate-700');
+            const coverHtml = imagenPortada
+                ? `<img src="${imagenPortada}" class="absolute inset-0 w-full h-full object-cover" alt="Portada ${uni.siglas || ''}">
+                   <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>`
+                : '';
+
             container.innerHTML = `
                 <div class="animate-in slide-in-from-right-8 fade-in duration-300 bg-white min-h-[calc(100vh-4rem)]">
-                    <div class="${uni.color || 'bg-slate-700'} text-white pt-6 pb-10 px-4">
-                        <div class="max-w-5xl mx-auto">
+                    <div class="${headerBg} text-white pt-6 pb-10 px-4">
+                        ${coverHtml}
+                        <div class="max-w-5xl mx-auto relative z-10">
                             <button onclick="navigateTo('')" class="flex items-center text-white/80 hover:text-white mb-6 bg-white/10 px-4 py-2 rounded-lg backdrop-blur-sm w-max transition-colors">
                                 <span class="material-symbols-outlined mr-2">arrow_back</span> Volver
                             </button>
