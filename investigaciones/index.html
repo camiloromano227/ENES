@@ -97,6 +97,24 @@
             </div>
         </div>
 
+        <!-- Banner de portada para universidad seleccionada -->
+        <div id="university-banner" style="display:none" class="shrink-0">
+            <div class="relative h-44 md:h-52 overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-r from-indigo-900 to-slate-800"></div>
+                <img id="banner-img" src="" alt="" class="absolute inset-0 w-full h-full object-cover hidden">
+                <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
+                <div class="absolute bottom-0 left-0 right-0 px-6 pb-6 max-w-7xl mx-auto">
+                    <p id="banner-siglas" class="text-indigo-300 text-xs font-bold uppercase tracking-widest mb-1"></p>
+                    <h2 id="banner-nombre" class="text-xl md:text-2xl font-extrabold text-white leading-tight"></h2>
+                    <p id="banner-facultad" class="text-slate-300 text-sm font-medium mt-1"></p>
+                    <p class="text-slate-400 text-xs mt-1 flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[14px]">location_on</span>
+                        <span id="banner-ubicacion"></span>
+                    </p>
+                </div>
+            </div>
+        </div>
+
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full flex-grow flex flex-col">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-bold text-slate-800" id="results-count">Sincronizando base de datos...</h2>
@@ -122,7 +140,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyB58mSlST85kAYJDaKzZFdmfjd8LK1CndQ",
@@ -161,19 +179,25 @@
 
         function initApp() {
             onSnapshot(collection(db, 'universidades'), (uniSnapshot) => {
+                const seleccionActual = uniFilter.value;
                 universitiesMap = {};
                 uniFilter.innerHTML = '<option value="">Todas las facultades</option>';
-                
+
                 uniSnapshot.docs.forEach(doc => {
                     const data = doc.data();
                     universitiesMap[doc.id] = data;
-                    
+
                     const option = document.createElement('option');
                     option.value = doc.id;
                     option.textContent = data.siglas ? `${data.siglas} - ${data.nombre}` : data.nombre;
                     uniFilter.appendChild(option);
                 });
-                
+
+                if (seleccionActual) {
+                    uniFilter.value = seleccionActual;
+                    showUniversityBanner(seleccionActual);
+                }
+
                 if (allInvestigations.length > 0) applyFilters();
             });
 
@@ -354,14 +378,47 @@
             container.innerHTML = itemsHtml + paginationControls;
         }
 
+        async function showUniversityBanner(uniId) {
+            const uniData = universitiesMap[uniId] || {};
+
+            document.getElementById('banner-siglas').textContent = uniData.siglas || '';
+            document.getElementById('banner-nombre').textContent = uniData.nombre || '';
+            document.getElementById('banner-facultad').textContent = uniData.facultad || '';
+            document.getElementById('banner-ubicacion').textContent = uniData.ubicacion || '';
+
+            const bannerImg = document.getElementById('banner-img');
+            const portadaSnap = await getDoc(doc(db, 'portadas', uniId));
+            if (portadaSnap.exists()) {
+                bannerImg.src = portadaSnap.data().imagen;
+                bannerImg.classList.remove('hidden');
+            } else {
+                bannerImg.classList.add('hidden');
+                bannerImg.src = '';
+            }
+
+            document.getElementById('university-banner').style.display = 'block';
+        }
+
+        function hideUniversityBanner() {
+            document.getElementById('university-banner').style.display = 'none';
+        }
+
         searchInput.addEventListener('input', applyFilters);
-        uniFilter.addEventListener('change', applyFilters);
+        uniFilter.addEventListener('change', () => {
+            if (uniFilter.value) {
+                showUniversityBanner(uniFilter.value);
+            } else {
+                hideUniversityBanner();
+            }
+            applyFilters();
+        });
         yearFilter.addEventListener('change', applyFilters);
 
         resetBtn.addEventListener('click', () => {
             searchInput.value = '';
             uniFilter.value = '';
             yearFilter.value = '';
+            hideUniversityBanner();
             applyFilters();
         });
 
