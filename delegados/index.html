@@ -98,7 +98,7 @@
                             <span class="material-symbols-outlined mr-2 text-sm">campaign</span> Publicar Comunicado
                         </button>
                         <button onclick="switchTab('tab-investigaciones')" id="btn-tab-investigaciones" class="tab-btn pb-4 font-semibold text-slate-500 border-b-2 border-transparent hover:text-slate-700 whitespace-nowrap transition-colors flex items-center">
-                            <span class="material-symbols-outlined mr-2 text-sm">science</span> Subir Investigación
+                            <span class="material-symbols-outlined mr-2 text-sm">science</span> Investigaciones
                         </button>
                     </div>
                 </div>
@@ -107,6 +107,7 @@
             <div class="flex-grow bg-slate-50 py-10">
                 <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
                     
+                    <!-- TAB PERFIL -->
                     <div id="tab-perfil" class="tab-content animate-in fade-in duration-300">
                         <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 md:p-10">
                             <h2 class="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4">Actualizar datos de la facultad</h2>
@@ -187,6 +188,7 @@
                         </div>
                     </div>
 
+                    <!-- TAB NOTICIAS -->
                     <div id="tab-noticias" class="tab-content hidden animate-in fade-in duration-300">
                         <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 md:p-10">
                             <h2 class="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4">Redactar nuevo comunicado</h2>
@@ -228,9 +230,12 @@
                         </div>
                     </div>
 
-                    <div id="tab-investigaciones" class="tab-content hidden animate-in fade-in duration-300">
+                    <!-- TAB INVESTIGACIONES -->
+                    <div id="tab-investigaciones" class="tab-content hidden animate-in fade-in duration-300 space-y-8">
+                        
+                        <!-- Formulario de carga / edición -->
                         <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 md:p-10 border-t-4 border-t-indigo-500">
-                            <h2 class="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 flex items-center">
+                            <h2 id="inv-form-title" class="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 flex items-center">
                                 <span class="material-symbols-outlined mr-2 text-indigo-500">science</span> Subir al Directorio Nacional
                             </h2>
                             <form id="form-investigacion" onsubmit="uploadInvestigation(event)" class="space-y-6">
@@ -272,13 +277,27 @@
                                     <textarea id="inv-resumen" rows="5" required class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 bg-slate-50"></textarea>
                                 </div>
                                 <div id="msg-investigacion" class="hidden text-sm font-medium text-center p-3 rounded-lg"></div>
-                                <div class="flex justify-end pt-4">
+                                <div class="flex justify-end pt-4 gap-3">
+                                    <button type="button" id="btn-cancel-inv" onclick="cancelEditInv()" class="hidden flex items-center bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 px-6 rounded-xl transition-all">
+                                        <span class="material-symbols-outlined mr-2">close</span> Cancelar
+                                    </button>
                                     <button type="submit" id="btn-save-inv" class="flex items-center bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-md">
                                         <span class="material-symbols-outlined mr-2">cloud_upload</span> Indexar Trabajo
                                     </button>
                                 </div>
                             </form>
                         </div>
+
+                        <!-- Lista de investigaciones subidas -->
+                        <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 md:p-10">
+                            <h2 class="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 flex items-center">
+                                <span class="material-symbols-outlined mr-2 text-slate-400">library_books</span> Trabajos Subidos
+                            </h2>
+                            <div id="lista-investigaciones" class="space-y-4">
+                                <p class="text-slate-500 italic text-sm">Cargando investigaciones...</p>
+                            </div>
+                        </div>
+
                     </div>
 
                 </div>
@@ -289,7 +308,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, getDocs, doc, setDoc, getDoc, updateDoc, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, doc, setDoc, getDoc, updateDoc, addDoc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyB58mSlST85kAYJDaKzZFdmfjd8LK1CndQ",
@@ -306,6 +325,10 @@
 
         let currentUser = null;
         let delegateData = null;
+        
+        // Variables para gestionar investigaciones
+        let userInvestigations = [];
+        let editingInvId = null;
 
         if (document.fonts) {
             document.fonts.load('1em "Material Symbols Outlined"').then(() => {
@@ -338,6 +361,7 @@
                     document.getElementById('nav-user-name').textContent = `Hola, ${delegateData.nombre}`;
                     showDashboard();
                     loadUniversityData();
+                    loadInvestigations(); // Cargar la lista al iniciar sesión
                 } else {
                     auth.signOut();
                 }
@@ -526,14 +550,122 @@
             }
         }
 
+        // ---------- NUEVA LÓGICA DE INVESTIGACIONES ----------
+
+        async function loadInvestigations() {
+            if (!delegateData || !delegateData.universidadId) return;
+            const container = document.getElementById('lista-investigaciones');
+            
+            try {
+                const q = query(collection(db, 'investigaciones'), where('universidadId', '==', delegateData.universidadId));
+                const querySnapshot = await getDocs(q);
+                
+                userInvestigations = [];
+                querySnapshot.forEach((docSnap) => {
+                    userInvestigations.push({ id: docSnap.id, ...docSnap.data() });
+                });
+
+                renderInvestigations();
+            } catch (error) {
+                console.error("Error cargando investigaciones:", error);
+                container.innerHTML = '<p class="text-red-500 text-sm">Error al cargar las investigaciones. Intenta actualizar la página.</p>';
+            }
+        }
+
+        function renderInvestigations() {
+            const container = document.getElementById('lista-investigaciones');
+            
+            if (userInvestigations.length === 0) {
+                container.innerHTML = '<p class="text-slate-500 italic text-sm">Aún no has subido ninguna investigación.</p>';
+                return;
+            }
+
+            // Ordenamos localmente por fecha (opcional pero recomendado)
+            const sorted = [...userInvestigations].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+            container.innerHTML = sorted.map(inv => `
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-indigo-300 transition-colors">
+                    <div class="flex-grow">
+                        <h4 class="font-bold text-slate-800 text-base leading-tight mb-1">${inv.titulo}</h4>
+                        <p class="text-sm text-slate-600 mb-1"><span class="font-medium">Autores:</span> ${inv.autores}</p>
+                        <div class="flex items-center gap-2 text-xs font-medium">
+                            <span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">${inv.categoria}</span>
+                            <span class="text-slate-500">${inv.fecha}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button type="button" onclick="editInvestigation('${inv.id}')" class="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center justify-center" title="Editar Documento">
+                            <span class="material-symbols-outlined text-xl">edit</span>
+                        </button>
+                        <button type="button" onclick="deleteInvestigation('${inv.id}')" class="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors flex items-center justify-center" title="Eliminar Documento">
+                            <span class="material-symbols-outlined text-xl">delete</span>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        window.editInvestigation = function(id) {
+            const inv = userInvestigations.find(i => i.id === id);
+            if (!inv) return;
+            
+            editingInvId = id;
+            
+            document.getElementById('inv-form-title').innerHTML = '<span class="material-symbols-outlined mr-2 text-indigo-500">edit_document</span> Editar Trabajo Indexado';
+            
+            document.getElementById('inv-titulo').value = inv.titulo;
+            document.getElementById('inv-autores').value = inv.autores;
+            document.getElementById('inv-fecha').value = inv.fecha;
+            document.getElementById('inv-categoria').value = inv.categoria;
+            document.getElementById('inv-enlace').value = inv.enlace;
+            document.getElementById('inv-resumen').value = inv.resumen;
+            document.getElementById('inv-palabras').value = (inv.palabrasClave || []).join(', ');
+
+            document.getElementById('btn-save-inv').innerHTML = '<span class="material-symbols-outlined mr-2">save</span> Actualizar Trabajo';
+            document.getElementById('btn-cancel-inv').classList.remove('hidden');
+            
+            // Hacer scroll suave hacia el formulario
+            document.getElementById('form-investigacion').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        window.cancelEditInv = function() {
+            editingInvId = null;
+            document.getElementById('form-investigacion').reset();
+            document.getElementById('inv-fecha').value = new Date().toISOString().split('T')[0];
+            
+            document.getElementById('inv-form-title').innerHTML = '<span class="material-symbols-outlined mr-2 text-indigo-500">science</span> Subir al Directorio Nacional';
+            document.getElementById('btn-save-inv').innerHTML = '<span class="material-symbols-outlined mr-2">cloud_upload</span> Indexar Trabajo';
+            document.getElementById('btn-cancel-inv').classList.add('hidden');
+        }
+
+        window.deleteInvestigation = async function(id) {
+            if (!confirm("¿Estás seguro de que deseas eliminar este trabajo? Esta acción no se puede deshacer.")) return;
+            
+            try {
+                await deleteDoc(doc(db, 'investigaciones', id));
+                // Recargar la lista tras eliminar
+                await loadInvestigations();
+                
+                // Si el usuario estaba editando este mismo documento, reseteamos el form
+                if (editingInvId === id) {
+                    cancelEditInv();
+                }
+            } catch (error) {
+                console.error("Error al eliminar:", error);
+                alert("Hubo un error al intentar eliminar el documento.");
+            }
+        }
+
         window.uploadInvestigation = async function(e) {
             e.preventDefault();
             if (!delegateData || !delegateData.universidadId) return;
 
             const btn = document.getElementById('btn-save-inv');
             const msg = document.getElementById('msg-investigacion');
+            const originalBtnText = editingInvId ? '<span class="material-symbols-outlined mr-2">save</span> Actualizar Trabajo' : '<span class="material-symbols-outlined mr-2">cloud_upload</span> Indexar Trabajo';
+            
             btn.disabled = true;
-            btn.innerHTML = '<span class="material-symbols-outlined animate-spin mr-2">progress_activity</span> Indexando...';
+            btn.innerHTML = '<span class="material-symbols-outlined animate-spin mr-2">progress_activity</span> Guardando...';
 
             const rawPalabras = document.getElementById('inv-palabras').value;
             const arrayPalabras = rawPalabras.split(',').map(kw => kw.trim()).filter(kw => kw.length > 0);
@@ -550,18 +682,33 @@
             };
 
             try {
-                const invRef = collection(db, 'investigaciones');
-                await addDoc(invRef, invData);
-                showMessage(msg, 'success', '¡Trabajo académico subido al directorio nacional!');
-                document.getElementById('form-investigacion').reset();
-                document.getElementById('inv-fecha').value = new Date().toISOString().split('T')[0];
+                if (editingInvId) {
+                    // MODO ACTUALIZACIÓN
+                    const invRef = doc(db, 'investigaciones', editingInvId);
+                    await updateDoc(invRef, invData);
+                    showMessage(msg, 'success', '¡Trabajo académico actualizado correctamente!');
+                    cancelEditInv(); // Reinicia el formulario
+                } else {
+                    // MODO CREACIÓN
+                    const invRef = collection(db, 'investigaciones');
+                    await addDoc(invRef, invData);
+                    showMessage(msg, 'success', '¡Trabajo académico subido al directorio nacional!');
+                    document.getElementById('form-investigacion').reset();
+                    document.getElementById('inv-fecha').value = new Date().toISOString().split('T')[0];
+                }
+                
+                // Recargamos la lista con el nuevo o modificado documento
+                await loadInvestigations();
+                
             } catch (error) {
-                showMessage(msg, 'error', 'Fallo al intentar subir el documento al directorio.');
+                showMessage(msg, 'error', 'Fallo al intentar guardar el documento en el directorio.');
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '<span class="material-symbols-outlined mr-2">cloud_upload</span> Indexar Trabajo';
+                btn.innerHTML = originalBtnText;
             }
         }
+
+        // -----------------------------------------------------
 
         function comprimirImagen(file, maxWidth = 1920, maxHeight = 700, quality = 0.95) {
             return new Promise((resolve) => {
